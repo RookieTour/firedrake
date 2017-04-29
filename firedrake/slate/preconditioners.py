@@ -218,14 +218,18 @@ class HybridizationPC(PCBase):
         lambdar = self.trace_solution
 
         M = D - C * A.inv * B
-        R = K_1.T - C * A.inv * K_0.T
-        u_rec = M.inv * f - M.inv * (R * lambdar + C * A.inv * g)
+        Mfg = M.inv * f - M.inv * C * A.inv * g
+        L = C * A.inv * K_0.T * lambdar - K_1.T * lambdar
+        Mlambda = M.inv * L
+        u_rec = Mfg + Mlambda
         self._assemble_sub_unknown = create_assembly_callable(
             u_rec,
             tensor=u,
             form_compiler_parameters=self.cxt.fc_params)
 
-        sigma_rec = A.inv * g - A.inv * (B * u + K_0.T * lambdar)
+        Agu = A.inv * g - A.inv * B * u
+        Alambda = A.inv * K_0.T * lambdar
+        sigma_rec = Agu - Alambda
         self._assemble_elim_unknown = create_assembly_callable(
             sigma_rec,
             tensor=sigma,
