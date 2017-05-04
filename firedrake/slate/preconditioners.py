@@ -181,6 +181,7 @@ class HybridizationPC(PCBase):
         tol = opts.getReal(prefix + "projector_tolerance", 1e-8)
         self.projector = Projector(self.broken_solution.split()[self.vidx],
                                    self.unbroken_solution.split()[self.vidx],
+                                   bcs=self.cxt.row_bcs,
                                    solver_parameters={"ksp_type": "cg",
                                                       "ksp_rtol": tol})
 
@@ -218,18 +219,14 @@ class HybridizationPC(PCBase):
         lambdar = self.trace_solution
 
         M = D - C * A.inv * B
-        Mfg = M.inv * f - M.inv * C * A.inv * g
-        L = C * A.inv * K_0.T * lambdar - K_1.T * lambdar
-        Mlambda = M.inv * L
-        u_rec = Mfg + Mlambda
+        R = K_1.T - C * A.inv * K_0.T
+        u_rec = M.inv * f - M.inv * (R * lambdar + C * A.inv * g)
         self._assemble_sub_unknown = create_assembly_callable(
             u_rec,
             tensor=u,
             form_compiler_parameters=self.cxt.fc_params)
 
-        Agu = A.inv * g - A.inv * B * u
-        Alambda = A.inv * K_0.T * lambdar
-        sigma_rec = Agu - Alambda
+        sigma_rec = A.inv * g - A.inv * (B * u + K_0.T * lambdar)
         self._assemble_elim_unknown = create_assembly_callable(
             sigma_rec,
             tensor=sigma,
@@ -269,6 +266,7 @@ class HybridizationPC(PCBase):
         unbroken_scalar_data = self.unbroken_rhs.split()[self.pidx]
         broken_scalar_data = self.broken_rhs.split()[self.pidx]
         self.data_projector.project()
+
         unbroken_scalar_data.dat.copy(broken_scalar_data.dat)
 
         # Compute the rhs for the multiplier system
